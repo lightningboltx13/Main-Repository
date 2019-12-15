@@ -2,6 +2,7 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Arrays;
 
 
 /*
@@ -23,6 +24,8 @@ public class Grid
 	public static void main(String[] args) throws IOException {Grid StartUp = new Grid();}
 	
 	Cell[] Cell_Map = new Cell[81];
+	
+	Cell[][] Area_Map = new Cell[18][9];
 	
 	int Row = 0, Column = 0;
 	int Cell_Index = 0;
@@ -159,6 +162,10 @@ public class Grid
 			System.exit(0);
 		}
 		
+		
+		Area_Map = All_Area();
+		
+		
 		while(Solved == false)
 		{
 			Solve_Count = 0;			
@@ -171,11 +178,20 @@ public class Grid
 				if(Cell_Map[Grid_Index].Answer == 0)
 					Linear_Logic(Cell_Map[Grid_Index]);
 			
+			for(int Area_Index = 0; Area_Index < 27; Area_Index++)
+				Common_Logic(Area_Map[Area_Index]);
+			
+			for(int Area_Index = 0; Area_Index < 18; Area_Index++)
+				Locked_Logic(Area_Map[Area_Index], Area_Index);
+			
 			for(int Grid_Index = 0; Grid_Index < 81; Grid_Index++)
 				if(Cell_Map[Grid_Index].Answer == 0)
 					Only_Option(Cell_Map[Grid_Index]);
 			
 			Check_Solved();
+			
+			//Print_Possible(29);
+			
 			Print_Solution(Cell_Map);
 			if(Solve_Count == 0)
 			{
@@ -191,6 +207,14 @@ public class Grid
 		// TODO Auto-generated constructor stub
 	}
 
+	
+	//Debugger Print Possible Answer for a target cell
+	public void Print_Possible(int Target)
+	{
+		for(int i=0;i<9;i++)
+			System.out.println((i+1) + " " + Cell_Map[Target].Possible_Answers[i]);
+	}
+	
 	
 	public void Duplicate_Checker(Cell[][] Area, Cell Target)
 	{
@@ -288,8 +312,8 @@ public class Grid
 			for(int i=0;i<9;i++)
 				if(Target.Possible_Answers[i])
 				{
-					Target.Answer = i+1;
-					Solve_Count++;
+					Solve_Cell(Target,i + 1);
+					i = 9;
 				}
 		
 		
@@ -301,9 +325,122 @@ public class Grid
 	}
 	
 	
-	public void Combined_Logic()
-	{
+	//Apply Less Obvious Tripples or Quads
+	//	EXAMPLE: CELLS' Possible_Answers: Cell A:{1,2,3} CELL B:{1,2} CELL C:{1,3} still a Match 
+	
+	//Pass in a row or column
+	public void Common_Logic(Cell[] Area)
+	{		
+		boolean[][] Pattern_List = new boolean[9][];
 		
+		int[] Pattern_Count = new int[9];
+		
+		for(int i=0;i<9;i++)
+			Pattern_Count[i] = 0;
+		
+		for(int Area_Index=0;Area_Index<9;Area_Index++)
+			if(Area[Area_Index].Answer == 0)
+				for(int Pattern_Index=0;Pattern_Index<9;Pattern_Index++)
+					if(Pattern_List[Pattern_Index] != null)
+					{
+						if(Arrays.equals(Pattern_List[Pattern_Index],Area[Area_Index].Possible_Answers))
+						{
+							Pattern_Count[Pattern_Index]++;
+							Pattern_Index = 9;
+						}
+					}
+					else
+					{
+						Pattern_List[Pattern_Index] = Area[Area_Index].Possible_Answers;
+						Pattern_Count[Pattern_Index]++;
+						Pattern_Index = 9;
+					}
+		
+		
+		//looking for the patterns to have the same number of possible answers as number of patterns that match
+		//example pattern with 2 possible answers has a count of 2 cells with that pattern
+		for(int Pattern_Index=0;Pattern_Index<9;Pattern_Index++)
+		{
+			if(Pattern_Count[Pattern_Index]>0 & Pattern_Count[Pattern_Index]<9)
+			{
+				int Answer_Count = 0;
+				for(int Answer_Index=0;Answer_Index<9;Answer_Index++)
+					if(Pattern_List[Pattern_Index][Answer_Index])
+						Answer_Count++;
+				
+				//here we need to add the removal of possible answers from all cells not involved in the matching
+				//patterns. Look for matching pattern and if not remove all possible answers in the match.
+				if(Pattern_Count[Pattern_Index] == Answer_Count)
+					for(int Area_Index=0;Area_Index<9;Area_Index++)
+						if(!Arrays.equals(Pattern_List[Pattern_Index],Area[Area_Index].Possible_Answers) & Area[Area_Index].Answer == 0)
+							for(int Answer_Index=0;Answer_Index<9;Answer_Index++)
+								if(Pattern_List[Pattern_Index][Answer_Index])
+									if(Area[Area_Index].Possible_Answers[Answer_Index])
+									{
+										Area[Area_Index].Possible_Answers[Answer_Index] = false;
+										Solve_Count++;
+									}
+			}
+			else
+				Pattern_Index = 9;
+		}
+		
+		
+	}
+	
+	
+	//If all the possible answer for a line fall in 1 box all other cells in that box must not be that answer
+	public void Locked_Logic(Cell[] Area, int Line)
+	{
+		boolean[] Remaining_Answers = new boolean[9];
+		
+		for(int i=0;i<9;i++)
+			Remaining_Answers[i] = true;
+		
+		for(int Area_Index=0;Area_Index<9;Area_Index++)
+			if(Area[Area_Index].Answer > 0)
+				Remaining_Answers[Area[Area_Index].Answer-1] = false;
+		
+		for(int Answer_Index=0;Answer_Index<9;Answer_Index++)
+			if(Remaining_Answers[Answer_Index])
+			{			
+				boolean Lock_Box = true;
+				int Unquie_Box = 9;
+				for(int Area_Index=0;Area_Index<9;Area_Index++)
+				{
+					if(Area[Area_Index].Possible_Answers[Answer_Index])
+					{
+						if(Unquie_Box != 9)
+						{
+							if(Unquie_Box != Area[Area_Index].Box)
+							{
+								Area_Index = 9;
+								Lock_Box = false;
+							}
+						}
+						else
+							Unquie_Box = Area[Area_Index].Box;
+					}
+				}
+				if(Lock_Box)
+				{
+					for(int Area_Index=0;Area_Index<9;Area_Index++)
+					{
+						if(Area_Map[18 + Unquie_Box][Area_Index].Row != Line & Line < 9)
+							if(Area_Map[18 + Unquie_Box][Area_Index].Possible_Answers[Answer_Index])
+							{
+								Area_Map[18 + Unquie_Box][Area_Index].Possible_Answers[Answer_Index] = false;
+								Solve_Count++;
+							}
+						if(Area_Map[18 + Unquie_Box][Area_Index].Column != (Line - 9) & Line > 8)	
+							if(Area_Map[18 + Unquie_Box][Area_Index].Possible_Answers[Answer_Index])
+							{
+								Area_Map[18 + Unquie_Box][Area_Index].Possible_Answers[Answer_Index] = false;
+								Solve_Count++;
+							}
+					}
+				}
+			}
 	}
 	
 	public void Solve_Cell(Cell Target)
@@ -323,27 +460,18 @@ public class Grid
 			{
 				if(Check_Answer(Solve_Row, Answer_Index, Target) & Answer_Index < 9)
 				{
-					Target.Answer = Answer_Index + 1;
+					Solve_Cell(Target,Answer_Index + 1);
 					Answer_Index = 9;
-					Target.Possible_Answer_Set(Target.Answer);
-					Update_Possible_Answers(Target);
-					Solve_Count++;
 				}
 				if(Check_Answer(Solve_Column, Answer_Index, Target) & Answer_Index < 9)
 				{
-					Target.Answer = Answer_Index + 1;
+					Solve_Cell(Target,Answer_Index + 1);
 					Answer_Index = 9;
-					Target.Possible_Answer_Set(Target.Answer);
-					Update_Possible_Answers(Target);
-					Solve_Count++;
 				}
 				if(Check_Answer(Solve_Box, Answer_Index, Target) & Answer_Index < 9)
 				{
-					Target.Answer = Answer_Index + 1;
+					Solve_Cell(Target,Answer_Index + 1);
 					Answer_Index = 9;
-					Target.Possible_Answer_Set(Target.Answer);
-					Update_Possible_Answers(Target);
-					Solve_Count++;
 				}
 					
 			}
@@ -351,6 +479,14 @@ public class Grid
 		
 	}
 	
+	
+	public void Solve_Cell(Cell Target, int Answer)
+	{
+		Target.Answer = Answer;
+		Target.Possible_Answer_Set(Answer);
+		Update_Possible_Answers(Target);
+		Solve_Count++;
+	}
 	
 	public Cell[][] Area_Finder(Cell Target) 
 	{
@@ -386,6 +522,21 @@ public class Grid
 		Return_Area[0] = Return_Row;
 		Return_Area[1] = Return_Column;
 		Return_Area[2] = Return_Box;
+		
+		return Return_Area;
+	}
+	
+	
+	public Cell[][] All_Area()
+	{
+		Cell[][] Return_Area = new Cell[27][9];
+		
+		for(int Grid_Index = 0; Grid_Index < 81; Grid_Index++)
+		{
+			Return_Area[Cell_Map[Grid_Index].Row][Cell_Map[Grid_Index].Column] = Cell_Map[Grid_Index];
+			Return_Area[Cell_Map[Grid_Index].Column + 9][Cell_Map[Grid_Index].Row] = Cell_Map[Grid_Index];
+			Return_Area[Cell_Map[Grid_Index].Box + 18][(Cell_Map[Grid_Index].Column % 3)+(3*(Cell_Map[Grid_Index].Row % 3))] = Cell_Map[Grid_Index];
+		}
 		
 		return Return_Area;
 	}
